@@ -1,0 +1,85 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:VoiceKeyboard.ViewModels"
+        x:Class="VoiceKeyboard.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="Voice Keyboard - Whisper"
+        Width="480" Height="400"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False">
+
+    <Design.DataContext>
+        <vm:MainViewModel />
+    </Design.DataContext>
+
+    <Border Background="#1e1e2e" Padding="20" CornerRadius="8">
+        <StackPanel Spacing="12" VerticalAlignment="Center">
+
+            <!-- Status + Speech Indicator -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
+                <Ellipse Width="14" Height="14"
+                         Fill="#f38ba8"
+                         IsVisible="{Binding IsSpeechDetected}" />
+                <Ellipse Width="14" Height="14"
+                         Fill="#585b70"
+                         IsVisible="{Binding !IsSpeechDetected}" />
+                <TextBlock Text="{Binding StatusText}"
+                           Foreground="#cdd6f4"
+                           FontSize="16"
+                           TextWrapping="Wrap"
+                           VerticalAlignment="Center" />
+            </StackPanel>
+
+            <!-- Last Transcription -->
+            <Border Background="#313244" CornerRadius="6" Padding="12" MinHeight="80">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <TextBlock Text="{Binding LastTranscription}"
+                               Foreground="#a6e3a1"
+                               FontSize="14"
+                               TextWrapping="Wrap" />
+                </ScrollViewer>
+            </Border>
+
+            <!-- Buttons -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
+                <Button Content="{Binding StartButtonText}"
+                        Command="{Binding ToggleStartCommand}"
+                        IsEnabled="{Binding IsReady}"
+                        Padding="24 10"
+                        CornerRadius="6"
+                        Foreground="#1e1e2e"
+                        Background="#89b4fa" />
+                <Button Content="{Binding PauseButtonText}"
+                        Command="{Binding TogglePauseCommand}"
+                        IsEnabled="{Binding IsListening}"
+                        Padding="24 10"
+                        CornerRadius="6"
+                        Foreground="#1e1e2e"
+                        Background="#f9e2af" />
+            </StackPanel>
+
+            <!-- Model Selector -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
+                <TextBlock Text="Model:"
+                           Foreground="#a6adc8"
+                           FontSize="13"
+                           VerticalAlignment="Center" />
+                <ComboBox ItemsSource="{Binding AvailableModels}"
+                          SelectedItem="{Binding SelectedModel}"
+                          MinWidth="140"
+                          FontSize="13" />
+            </StackPanel>
+
+            <!-- Options -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="20">
+                <CheckBox Content="Auto-type text"
+                          IsChecked="{Binding AutoType}"
+                          Foreground="#cdd6f4" />
+                <CheckBox Content="Wayland (ydotool)"
+                          IsChecked="{Binding UseWayland}"
+                          Foreground="#cdd6f4" />
+            </StackPanel>
+
+        </StackPanel>
+    </Border>
+</Window>

@@ -1,0 +1,30 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.dll
+*.pdb
+*.exe
+
+## Whisper models
+ggml-*.bin
+
+## Python
+__pycache__/
+*.pyc
+*.pyo
+
+## IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Build
+publish/
