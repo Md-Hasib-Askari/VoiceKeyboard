@@ -26,11 +26,15 @@ arecord (ALSA) → C# AudioCapture → pipe → Python Server → pipe → C# Av
 
 - `AudioCapture.cs` — Manages `arecord` subprocess, reads raw PCM frames via stdout
 - `WhisperTranscriber.cs` — Manages Python server lifecycle (start/stop/restart), streams audio in, reads events out
-- `RealtimeEngine.cs` — Glues AudioCapture + WhisperTranscriber together; exposes high-level Start/Stop/Pause/ChangeModel
+- `WhisperTranscriber.cs` — Manages Python server lifecycle (start/stop/restart), streams audio in, reads events out; includes `DetectPythonPathAsync()` for auto-detecting the correct Python interpreter
+- `RealtimeEngine.cs` — Glues AudioCapture + WhisperTranscriber together; exposes high-level Start/Stop/Pause/ChangeModel/ChangePythonPath
 - `KeyboardSimulator.cs` — Static helper that shells out to `xdotool type` or `ydotool type`
 - `transcribe_server.py` — Long-running Python process; reads 960-byte PCM frames from stdin, runs WebRTC VAD + faster-whisper transcription, outputs events to stdout
+- `ConfigService.cs` — Loads/saves user settings (e.g., Python path) to `~/.config/voice-keyboard/settings.json`
 
 # Build / Test / Run
+
+**Python path detection:** When launched as a desktop app (via `.desktop` entry), the shell environment may differ from a terminal session — tools like `pyenv`, `conda`, or custom `PATH` entries may not be available. `WhisperTranscriber.DetectPythonPathAsync()` probes `bash -lc "which python3"` to resolve the user's login-shell Python, then validates it has `webrtcvad` and `faster_whisper` installed. The detected path is persisted via `ConfigService` and used as the Python interpreter for the transcription subprocess. Users can also manually set or re-detect the Python path from the UI.
 
 ```bash
 # Build (Release)

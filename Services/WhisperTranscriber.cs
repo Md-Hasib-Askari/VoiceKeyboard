@@ -12,6 +12,7 @@ public class WhisperTranscriber : IAsyncDisposable
     private Process? _pythonProcess;
     private bool _initialized;
     private string _currentModel = "small";
+    private string _currentPythonPath = "python3";
 
     public string CurrentModel => _currentModel;
 
@@ -21,9 +22,9 @@ public class WhisperTranscriber : IAsyncDisposable
     public event Action? OnNoSpeech;
     public event Action<string>? OnError;
 
-    public async Task InitializeAsync(string model = "small")
+    public async Task InitializeAsync(string model = "small", string pythonPath = "python3")
     {
-        if (_initialized && _currentModel == model)
+        if (_initialized && _currentModel == model && _currentPythonPath == pythonPath)
             return;
 
         // Stop existing server if running
@@ -33,12 +34,13 @@ public class WhisperTranscriber : IAsyncDisposable
         }
 
         _currentModel = model;
+        _currentPythonPath = pythonPath;
 
         var scriptPath = Path.Combine(AppContext.BaseDirectory, "Scripts", "transcribe_server.py");
 
         var psi = new ProcessStartInfo
         {
-            FileName = "python3",
+            FileName = pythonPath,
             Arguments = $"-u \"{scriptPath}\" {model}",
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
@@ -51,7 +53,7 @@ public class WhisperTranscriber : IAsyncDisposable
         _pythonProcess =
             Process.Start(psi)
             ?? throw new InvalidOperationException("Failed to start Python process");
-        Console.WriteLine($"[Whisper] Python PID={_pythonProcess.Id}, model={model}");
+        Console.WriteLine($"[Whisper] Python PID={_pythonProcess.Id}, model={model}, python={pythonPath}");
 
         // Read stderr in background
         _ = Task.Run(async () =>
@@ -185,6 +187,69 @@ public class WhisperTranscriber : IAsyncDisposable
         {
             _pythonProcess?.Dispose();
             _pythonProcess = null;
+        }
+    }
+
+    public static async Task<string> DetectPythonPathAsync()
+    {
+        // Try to get python3 from user's login shell (handles pyenv, conda, etc.)
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "bash",
+                Arguments = "-lc \"which python3\"",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            using var process = Process.Start(psi);
+            if (process != null)
+            {
+                var output = await process.StandardOutput.ReadLineAsync();
+                await process.WaitForExitAsync();
+                if (!string.IsNullOrWhiteSpace(output))
+                {
+                    var path = output.Trim();
+                    if (await ProbePythonAsync(path) != null)
+                        return path;
+                }
+            }
+        }
+        catch { }
+
+        // Try common candidates
+        var candidates = new[] { "python3", "/usr/bin/python3" };
+        foreach (var candidate in candidates)
+        {
+            if (await ProbePythonAsync(candidate) != null)
+                return candidate;
+        }
+
+        return "python3";
+    }
+
+    public static async Task<string?> ProbePythonAsync(string pythonPath)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = pythonPath,
+                Arguments = "-c \"import webrtcvad; import faster_whisper\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            using var process = Process.Start(psi);
+            if (process == null) return null;
+            await process.WaitForExitAsync();
+            return process.ExitCode == 0 ? pythonPath : null;
+        }
+        catch
+        {
+            return null;
         }
     }
 }

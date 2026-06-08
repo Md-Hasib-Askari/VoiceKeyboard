@@ -18,6 +18,7 @@ public class RealtimeEngine : IAsyncDisposable
     public event Action<string>? OnStatusChanged;
 
     public string CurrentModel => _transcriber.CurrentModel;
+    public string PythonPath { get; set; } = "python3";
 
     public RealtimeEngine()
     {
@@ -49,7 +50,7 @@ public class RealtimeEngine : IAsyncDisposable
 
     public async Task InitializeAsync(string model = "small")
     {
-        await _transcriber.InitializeAsync(model);
+        await _transcriber.InitializeAsync(model, PythonPath);
     }
 
     public async Task ChangeModelAsync(string model)
@@ -64,7 +65,7 @@ public class RealtimeEngine : IAsyncDisposable
         }
 
         OnStatusChanged?.Invoke($"🔄 Loading {model}...");
-        await _transcriber.InitializeAsync(model);
+        await _transcriber.InitializeAsync(model, PythonPath);
 
         if (wasListening)
         {
@@ -107,6 +108,34 @@ public class RealtimeEngine : IAsyncDisposable
         _capture.Stop();
         OnSpeechEnd?.Invoke();
         OnStatusChanged?.Invoke("⏹ Stopped");
+    }
+
+    public async Task ChangePythonPathAsync(string pythonPath)
+    {
+        PythonPath = pythonPath;
+        var wasListening = _isListening;
+        var wasPaused = _isPaused;
+
+        if (wasListening)
+        {
+            _capture.Stop();
+            _isListening = false;
+        }
+
+        OnStatusChanged?.Invoke($"🔄 Restarting with Python: {pythonPath}...");
+        await _transcriber.InitializeAsync(CurrentModel, PythonPath);
+
+        if (wasListening)
+        {
+            _isListening = true;
+            _isPaused = wasPaused;
+            _capture.Start();
+            OnStatusChanged?.Invoke("🔴 Listening...");
+        }
+        else
+        {
+            OnStatusChanged?.Invoke($"Ready. Model: {CurrentModel}");
+        }
     }
 
     public async ValueTask DisposeAsync()

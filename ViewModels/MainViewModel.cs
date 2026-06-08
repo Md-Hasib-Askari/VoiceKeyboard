@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VoiceKeyboard.Services;
@@ -9,6 +11,7 @@ namespace VoiceKeyboard.ViewModels;
 public partial class MainViewModel : ObservableObject
 {
     private readonly RealtimeEngine _engine;
+    private readonly AppSettings _settings;
 
     [ObservableProperty]
     private string _statusText = "Initializing Whisper model...";
@@ -43,12 +46,21 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _selectedModel = "small";
 
+    [ObservableProperty]
+    private string _pythonPath = "python3";
+
+    [ObservableProperty]
+    private bool _isDetectingPython;
+
     public List<string> AvailableModels { get; } =
         new() { "tiny.en", "tiny", "base", "small", "medium", "large-v3" };
 
     public MainViewModel()
     {
         _engine = new RealtimeEngine();
+        _settings = ConfigService.Load();
+        PythonPath = _settings.PythonPath;
+        _engine.PythonPath = PythonPath;
         _engine.OnTranscription += OnTranscription;
         _engine.OnSpeechStart += () =>
             Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => IsSpeechDetected = true);
@@ -62,6 +74,30 @@ public partial class MainViewModel : ObservableObject
 
     private async void InitializeAsync()
     {
+        IsDetectingPython = true;
+        StatusText = "🔍 Detecting Python environment...";
+
+        try
+        {
+            var detected = await WhisperTranscriber.DetectPythonPathAsync();
+            if (!string.IsNullOrWhiteSpace(detected))
+            {
+                PythonPath = detected;
+                _engine.PythonPath = PythonPath;
+                _settings.PythonPath = PythonPath;
+                ConfigService.Save(_settings);
+                Console.WriteLine($"[ViewModel] Detected Python: {PythonPath}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ViewModel] Python detection failed: {ex.Message}");
+        }
+        finally
+        {
+            IsDetectingPython = false;
+        }
+
         try
         {
             await _engine.InitializeAsync(SelectedModel);
@@ -72,6 +108,17 @@ public partial class MainViewModel : ObservableObject
         {
             StatusText = $"Init failed: {ex.Message}";
         }
+    }
+
+    partial void OnPythonPathChanged(string value)
+    {
+        if (_engine.PythonPath == value)
+            return;
+        _settings.PythonPath = value;
+        ConfigService.Save(_settings);
+        IsReady = false;
+        _ = _engine.ChangePythonPathAsync(value);
+        IsReady = true;
     }
 
     partial void OnSelectedModelChanged(string value)
@@ -151,6 +198,22 @@ public partial class MainViewModel : ObservableObject
                 KeyboardSimulator.TypeTextWayland(text + " ");
             else
                 KeyboardSimulator.TypeText(text + " ");
+        }
+    }
+
+    [RelayCommand]
+    private async Task AutoDetectPython()
+    {
+        IsDetectingPython = true;
+        try
+        {
+            var detected = await WhisperTranscriber.DetectPythonPathAsync();
+            if (!string.IsNullOrWhiteSpace(detected))
+                PythonPath = detected;
+        }
+        finally
+        {
+            IsDetectingPython = false;
         }
     }
 }
