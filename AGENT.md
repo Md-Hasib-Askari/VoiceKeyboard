@@ -1,4 +1,3 @@
-```markdown
 # Project Overview
 
 Voice Keyboard is a real-time speech-to-text application for Linux that acts as a voice keyboard — transcribing speech and typing the result into whichever window has focus. The frontend is **C# / .NET 10 / Avalonia UI** using the **MVVM pattern** with CommunityToolkit.Mvvm. The ML pipeline (VAD + transcription) runs in a **Python subprocess** (`faster-whisper` + `webrtcvad`), communicating with C# via stdin/stdout pipes with near-zero IPC overhead (~0.002ms/frame). Audio capture uses Linux ALSA (`arecord`). Auto-typing uses `xdotool` (X11) or `ydotool` (Wayland).
@@ -12,6 +11,7 @@ arecord (ALSA) → C# AudioCapture → pipe → Python Server → pipe → C# Av
 ```
 
 **Data flow:**
+
 1. `arecord` captures 16kHz 16-bit mono PCM in 960-byte frames (30ms each)
 2. `AudioCapture.cs` reads frames and fires `OnAudioFrame` events
 3. `RealtimeEngine.cs` forwards frames to the Python server via `WhisperTranscriber.SendAudioFrame()`
@@ -23,6 +23,7 @@ arecord (ALSA) → C# AudioCapture → pipe → Python Server → pipe → C# Av
 **Model switching:** Changing the model dropdown in the UI kills the Python server and restarts it with the new model name as a CLI argument. Listening state is preserved across model changes.
 
 **Key components:**
+
 - `AudioCapture.cs` — Manages `arecord` subprocess, reads raw PCM frames via stdout
 - `WhisperTranscriber.cs` — Manages Python server lifecycle (start/stop/restart), streams audio in, reads events out
 - `RealtimeEngine.cs` — Glues AudioCapture + WhisperTranscriber together; exposes high-level Start/Stop/Pause/ChangeModel
@@ -73,5 +74,3 @@ chmod +x benchmark.sh
 - `Services/` — C# service layer: audio capture, Whisper server management, real-time engine, keyboard simulation
 - `ViewModels/` — MVVM ViewModels with CommunityToolkit.Mvvm source generators
 - `Views/` — Avalonia XAML views and code-behind (hotkeys only)
-
-```
