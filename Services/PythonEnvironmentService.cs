@@ -16,18 +16,23 @@ public static class PythonEnvironmentService
         Environment.GetEnvironmentVariable("XDG_DATA_HOME")
         ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".local", "share", "voice-keyboard");
+            ".local",
+            "share",
+            "voice-keyboard"
+        );
 
     private static readonly string VenvDir = Path.Combine(DataDir, "venv");
     private static readonly string VenvPython = Path.Combine(VenvDir, "bin", "python3");
     private static readonly string RequirementsPath = Path.Combine(
-        AppContext.BaseDirectory, "Scripts", "requirements.txt");
+        AppContext.BaseDirectory,
+        "Scripts",
+        "requirements.txt"
+    );
 
     public static string VenvPythonPath => VenvPython;
     public static bool VenvExists => File.Exists(VenvPython);
 
-    public static async Task<string> EnsureEnvironmentAsync(
-        Action<string>? onStatus = null)
+    public static async Task<string> EnsureEnvironmentAsync(Action<string>? onStatus = null)
     {
         // Step 1: Ensure uv is available
         var uvPath = await EnsureUvInstalledAsync(onStatus);
@@ -42,16 +47,36 @@ public static class PythonEnvironmentService
         }
 
         // Step 3: Install packages
+        // Install torch/torchaudio from CUDA wheel index first (only if not already installed)
+        bool torchInstalled = await CheckPackageInstalledAsync(uvPath, VenvPython, "torch");
+        if (!torchInstalled)
+        {
+            onStatus?.Invoke("📦 Installing PyTorch with CUDA (large download, ~2.5GB)...");
+            Console.WriteLine("[PythonEnv] Installing torch (CUDA)...");
+            await RunProcessAsync(
+                uvPath,
+                $"pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124 --python \"{VenvPython}\"",
+                600
+            );
+        }
+        else
+        {
+            Console.WriteLine("[PythonEnv] torch already installed, skipping");
+        }
+
         onStatus?.Invoke("📦 Installing Python packages...");
         Console.WriteLine("[PythonEnv] Installing packages...");
-        await RunProcessAsync(uvPath, $"pip install -r \"{RequirementsPath}\" --python \"{VenvPython}\"", 120);
+        await RunProcessAsync(
+            uvPath,
+            $"pip install -r \"{RequirementsPath}\" --python \"{VenvPython}\"",
+            120
+        );
         Console.WriteLine("[PythonEnv] Packages installed");
 
         return VenvPython;
     }
 
-    public static async Task<string> EnsureUvInstalledAsync(
-        Action<string>? onStatus = null)
+    public static async Task<string> EnsureUvInstalledAsync(Action<string>? onStatus = null)
     {
         // Try to find uv in PATH
         var uvPath = await WhichAsync("uv");
@@ -66,7 +91,10 @@ public static class PythonEnvironmentService
         {
             Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                ".local", "bin", "uv"),
+                ".local",
+                "bin",
+                "uv"
+            ),
             "/usr/local/bin/uv",
             "/usr/bin/uv",
         };
@@ -94,8 +122,8 @@ public static class PythonEnvironmentService
             CreateNoWindow = true,
         };
 
-        using var process = Process.Start(psi)
-            ?? throw new Exception("Failed to start uv installer");
+        using var process =
+            Process.Start(psi) ?? throw new Exception("Failed to start uv installer");
         await process.WaitForExitAsync();
 
         if (process.ExitCode != 0)
@@ -105,10 +133,14 @@ public static class PythonEnvironmentService
         }
 
         // Find newly installed uv
-        uvPath = await WhichAsync("uv")
+        uvPath =
+            await WhichAsync("uv")
             ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                ".local", "bin", "uv");
+                ".local",
+                "bin",
+                "uv"
+            );
 
         if (!File.Exists(uvPath))
             throw new Exception("uv was installed but cannot be found");
@@ -120,12 +152,14 @@ public static class PythonEnvironmentService
     /// <summary>
     /// Recreates the venv from scratch (useful for troubleshooting).
     /// </summary>
-    public static async Task<string> ResetEnvironmentAsync(
-        Action<string>? onStatus = null)
+    public static async Task<string> ResetEnvironmentAsync(Action<string>? onStatus = null)
     {
         if (Directory.Exists(VenvDir))
         {
-            try { Directory.Delete(VenvDir, recursive: true); }
+            try
+            {
+                Directory.Delete(VenvDir, recursive: true);
+            }
             catch { }
         }
 
@@ -146,7 +180,8 @@ public static class PythonEnvironmentService
             };
 
             using var process = Process.Start(psi);
-            if (process == null) return null;
+            if (process == null)
+                return null;
             var output = await process.StandardOutput.ReadLineAsync();
             await process.WaitForExitAsync();
             if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(output))
@@ -158,6 +193,35 @@ public static class PythonEnvironmentService
         }
         catch { }
         return null;
+    }
+
+    private static async Task<bool> CheckPackageInstalledAsync(
+        string uvPath,
+        string venvPython,
+        string package
+    )
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = uvPath,
+                Arguments = $"pip show {package} --python \"{venvPython}\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            using var process = Process.Start(psi);
+            if (process == null)
+                return false;
+            await process.WaitForExitAsync();
+            return process.ExitCode == 0;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static async Task RunProcessAsync(string fileName, string arguments, int timeoutSeconds)
@@ -172,8 +236,8 @@ public static class PythonEnvironmentService
             CreateNoWindow = true,
         };
 
-        using var process = Process.Start(psi)
-            ?? throw new Exception($"Failed to start: {fileName} {arguments}");
+        using var process =
+            Process.Start(psi) ?? throw new Exception($"Failed to start: {fileName} {arguments}");
 
         // Read stderr in background for logging
         _ = Task.Run(async () =>
@@ -184,7 +248,8 @@ public static class PythonEnvironmentService
                 while (true)
                 {
                     int read = await process.StandardError.ReadAsync(buf, 0, buf.Length);
-                    if (read == 0) break;
+                    if (read == 0)
+                        break;
                     Console.Write($"[PythonEnv:err] {new string(buf, 0, read)}");
                 }
             }
@@ -200,19 +265,21 @@ public static class PythonEnvironmentService
                 while (true)
                 {
                     int read = await process.StandardOutput.ReadAsync(buf, 0, buf.Length);
-                    if (read == 0) break;
+                    if (read == 0)
+                        break;
                     Console.Write($"[PythonEnv:out] {new string(buf, 0, read)}");
                 }
             }
             catch { }
         });
 
-        await process.WaitForExitAsync()
-            .WaitAsync(TimeSpan.FromSeconds(timeoutSeconds));
+        await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(timeoutSeconds));
 
         if (process.ExitCode != 0)
         {
-            throw new Exception($"Process failed (exit {process.ExitCode}): {fileName} {arguments}");
+            throw new Exception(
+                $"Process failed (exit {process.ExitCode}): {fileName} {arguments}"
+            );
         }
     }
 }

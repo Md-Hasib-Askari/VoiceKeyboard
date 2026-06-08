@@ -52,6 +52,9 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _isDetectingPython;
 
+    [ObservableProperty]
+    private string _deviceInfo = "Detecting...";
+
     public List<string> AvailableModels { get; } =
         new() { "tiny.en", "tiny", "base", "small", "medium", "large-v3" };
 
@@ -66,6 +69,8 @@ public partial class MainViewModel : ObservableObject
             Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => IsSpeechDetected = true);
         _engine.OnSpeechEnd += () =>
             Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => IsSpeechDetected = false);
+        _engine.OnDeviceDetected += device =>
+            Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => DeviceInfo = device);
         _engine.OnStatusChanged += status =>
             Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => StatusText = status);
 

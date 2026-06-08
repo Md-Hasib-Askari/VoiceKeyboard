@@ -21,6 +21,7 @@ public class WhisperTranscriber : IAsyncDisposable
     public event Action<string>? OnTranscription;
     public event Action? OnNoSpeech;
     public event Action<string>? OnError;
+    public event Action<string>? OnDeviceDetected;
 
     public async Task InitializeAsync(string model = "small", string pythonPath = "python3")
     {
@@ -108,6 +109,10 @@ public class WhisperTranscriber : IAsyncDisposable
         {
             var parts = line.Split('\t');
             Console.WriteLine($"[Whisper] Server ready: model={parts[1]}, device={parts[2]}");
+            var deviceStr = parts[2].Contains("cuda")
+                ? $"GPU ({parts[2]})"
+                : $"CPU ({parts[2]})";
+            OnDeviceDetected?.Invoke(deviceStr);
             _initialized = true;
             return;
         }

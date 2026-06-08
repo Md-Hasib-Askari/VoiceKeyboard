@@ -4,9 +4,10 @@
         x:Class="VoiceKeyboard.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="Voice Keyboard - Whisper"
-        Width="480" Height="460"
+        Width="520" Height="500"
         WindowStartupLocation="CenterScreen"
-        CanResize="False">
+        CanResize="True"
+        MinWidth="480" MinHeight="460">
 
     <Design.DataContext>
         <vm:MainViewModel />
@@ -31,7 +32,7 @@
             </StackPanel>
 
             <!-- Last Transcription -->
-            <Border Background="#313244" CornerRadius="6" Padding="12" MinHeight="80">
+            <Border Background="#313244" CornerRadius="6" Padding="12" MinHeight="60" MaxHeight="100">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <TextBlock Text="{Binding LastTranscription}"
                                Foreground="#a6e3a1"
@@ -70,16 +71,25 @@
                           FontSize="13" />
             </StackPanel>
 
-            <!-- Python Path -->
+            <!-- Device Info -->
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6">
-                <TextBlock Text="Python:"
-                           Foreground="#a6adc8"
-                           FontSize="13"
+                <TextBlock Text="{Binding DeviceInfo}"
+                           Foreground="#94e2d5"
+                           FontSize="12" />
+            </StackPanel>
+
+            <!-- Python Path (scrollable for long paths) -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6">
+                <TextBlock Text="Python:" Foreground="#a6adc8" FontSize="13"
                            VerticalAlignment="Center" />
-                <TextBox Text="{Binding PythonPath}"
-                         MinWidth="200"
-                         FontSize="13"
-                         IsEnabled="{Binding !IsDetectingPython}" />
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" MaxWidth="340">
+                    <TextBox Text="{Binding PythonPath}"
+                             MinWidth="200"
+                             FontSize="13"
+                             TextWrapping="NoWrap"
+                             AcceptsReturn="False"
+                             IsEnabled="{Binding !IsDetectingPython}" />
+                </ScrollViewer>
                 <Button Content="🔍"
                         Command="{Binding AutoDetectPythonCommand}"
                         IsEnabled="{Binding !IsDetectingPython}"

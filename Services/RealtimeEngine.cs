@@ -15,6 +15,7 @@ public class RealtimeEngine : IAsyncDisposable
     public event Action<string>? OnTranscription;
     public event Action? OnSpeechStart;
     public event Action? OnSpeechEnd;
+    public event Action<string>? OnDeviceDetected;
     public event Action<string>? OnStatusChanged;
 
     public string CurrentModel => _transcriber.CurrentModel;
@@ -40,6 +41,7 @@ public class RealtimeEngine : IAsyncDisposable
             if (!_isPaused)
                 OnTranscription?.Invoke(text);
         };
+        _transcriber.OnDeviceDetected += device => OnDeviceDetected?.Invoke(device);
 
         _capture.OnAudioFrame += frame =>
         {
