@@ -75,23 +75,22 @@ public partial class MainViewModel : ObservableObject
     private async void InitializeAsync()
     {
         IsDetectingPython = true;
-        StatusText = "🔍 Detecting Python environment...";
 
         try
         {
-            var detected = await WhisperTranscriber.DetectPythonPathAsync();
-            if (!string.IsNullOrWhiteSpace(detected))
-            {
-                PythonPath = detected;
-                _engine.PythonPath = PythonPath;
-                _settings.PythonPath = PythonPath;
-                ConfigService.Save(_settings);
-                Console.WriteLine($"[ViewModel] Detected Python: {PythonPath}");
-            }
+            StatusText = "🔍 Setting up Python environment...";
+            var venvPython = await WhisperTranscriber.DetectPythonPathAsync(status =>
+                Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => StatusText = status)
+            );
+            PythonPath = venvPython;
+            _engine.PythonPath = PythonPath;
+            _settings.PythonPath = PythonPath;
+            ConfigService.Save(_settings);
+            Console.WriteLine($"[ViewModel] Python ready: {PythonPath}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ViewModel] Python detection failed: {ex.Message}");
+            Console.WriteLine($"[ViewModel] Python environment setup failed: {ex.Message}");
         }
         finally
         {
@@ -207,9 +206,10 @@ public partial class MainViewModel : ObservableObject
         IsDetectingPython = true;
         try
         {
-            var detected = await WhisperTranscriber.DetectPythonPathAsync();
-            if (!string.IsNullOrWhiteSpace(detected))
-                PythonPath = detected;
+            var venvPython = await WhisperTranscriber.DetectPythonPathAsync(status =>
+                Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => StatusText = status)
+            );
+            PythonPath = venvPython;
         }
         finally
         {

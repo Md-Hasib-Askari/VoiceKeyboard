@@ -190,43 +190,10 @@ public class WhisperTranscriber : IAsyncDisposable
         }
     }
 
-    public static async Task<string> DetectPythonPathAsync()
+    public static async Task<string> DetectPythonPathAsync(Action<string>? onStatus = null)
     {
-        // Try to get python3 from user's login shell (handles pyenv, conda, etc.)
-        try
-        {
-            var psi = new ProcessStartInfo
-            {
-                FileName = "bash",
-                Arguments = "-lc \"which python3\"",
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-            using var process = Process.Start(psi);
-            if (process != null)
-            {
-                var output = await process.StandardOutput.ReadLineAsync();
-                await process.WaitForExitAsync();
-                if (!string.IsNullOrWhiteSpace(output))
-                {
-                    var path = output.Trim();
-                    if (await ProbePythonAsync(path) != null)
-                        return path;
-                }
-            }
-        }
-        catch { }
-
-        // Try common candidates
-        var candidates = new[] { "python3", "/usr/bin/python3" };
-        foreach (var candidate in candidates)
-        {
-            if (await ProbePythonAsync(candidate) != null)
-                return candidate;
-        }
-
-        return "python3";
+        // Use uv-managed venv — independent of conda/pyenv
+        return await PythonEnvironmentService.EnsureEnvironmentAsync(onStatus);
     }
 
     public static async Task<string?> ProbePythonAsync(string pythonPath)
