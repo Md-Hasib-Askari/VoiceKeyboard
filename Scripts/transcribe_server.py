@@ -14,7 +14,12 @@ SAMPLE_RATE = 16000
 FRAME_SIZE = 480
 FRAME_BYTES = FRAME_SIZE * 2
 SILENCE_TIMEOUT = 0.3
-MIN_SPEECH_DURATION = 0.3
+MIN_SPEECH_DURATION = 0.5
+
+HALLUCINATIONS = {
+    "thank you", "thank you.", "thanks for watching", "thank you for watching",
+    "you", "u", "um", "uh", "oh", "ah", "hmm", "hm", "mhm",
+}
 
 def main():
     model_name = sys.argv[1] if len(sys.argv) > 1 else "small"
@@ -40,7 +45,7 @@ def main():
     model = WhisperModel(model_name, device=device, compute_type=compute_type)
     print(f"READY\t{model_name}\t{device}/{compute_type}", flush=True)
 
-    vad = webrtcvad.Vad(3)
+    vad = webrtcvad.Vad(2)
 
     speech_buffer = []
     speech_active = False
@@ -81,12 +86,15 @@ def main():
                             language=language,
                             beam_size=1,
                             temperature=[0.0],
-                            compression_ratio_threshold=2.4,
+                            compression_ratio_threshold=1.8,
+                            no_speech_threshold=0.4,
+                            log_prob_threshold=-0.5,
                             condition_on_previous_text=False,
                             vad_filter=False,
                         )
                         text = " ".join(s.text for s in segments).strip()
-                        if text:
+                        lowered = text.lower().rstrip('.')
+                        if text and lowered not in HALLUCINATIONS and len(text) > 2:
                             print(f"RESULT\t{text}", flush=True)
                         else:
                             print("NO_SPEECH", flush=True)
