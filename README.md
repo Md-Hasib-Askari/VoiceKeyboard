@@ -11,7 +11,7 @@ Built with **C# / Avalonia UI** for the frontend and **Python** for the ML pipel
 - **Real-time streaming** — WebRTC VAD detects speech, auto-transcribes on silence (~440ms total latency)
 - **GPU Accelerated** — Uses CUDA/cuBLAS via faster-whisper (auto-falls back to CPU)
 - **Model Selector** — Switch between tiny.en, tiny, base, small, medium, large-v3 at runtime
-- **Auto-Type** — Transcribed text is typed via `xdotool` (X11) or `ydotool` (Wayland)
+- **Auto-Type** — Transcribed text is typed via `xdotool` (X11) or Wayland tools (`wtype` / `ydotool`)
 - **Dark Theme UI** — Catppuccin-inspired Avalonia UI with speech indicator
 - **Desktop App** — Install as a desktop application with icon and app launcher entry
 - **Hotkeys** — F9 to Start/Stop, F10 to Pause/Resume
@@ -34,10 +34,11 @@ Built with **C# / Avalonia UI** for the frontend and **Python** for the ML pipel
                                                 │ pipe (stdout)
                                                 ▼
                                      ┌──────────────────────┐
-                                     │  C# Avalonia UI      │
-                                     │  ├─ Speech indicator │
-                                     │  ├─ Model selector   │
-                                     │  └─ xdotool/ydotool  │
+                                      │  C# Avalonia UI      │
+                                      │  ├─ Speech indicator │
+                                      │  ├─ Model selector   │
+                                      │  └─ xdotool/wtype/   │
+                                      │     ydotool          │
                                      └──────────────────────┘
 ```
 
@@ -67,12 +68,28 @@ Built with **C# / Avalonia UI** for the frontend and **Python** for the ML pipel
    sudo apt install xdotool
    ```
 
-5. **ydotool** (Wayland auto-typing — check the UI checkbox)
+ 5. **Wayland typing tool** (check the UI "Wayland" checkbox)
 
-   ```bash
-   sudo apt install ydotool
-   sudo systemctl enable --now ydotool
-   ```
+    - **wtype** (recommended — works on wlroots-based compositors such as Sway/Hyprland)
+
+      ```bash
+      sudo apt install wtype
+      ```
+
+    - **ydotool** (requires the `ydotoold` daemon)
+
+      ```bash
+      sudo apt install ydotool ydotoold
+      ydotoold &
+      ```
+
+      To auto-start on login, add `ydotoold &` to your startup applications, or use:
+
+      ```bash
+      systemctl --user enable --now ydotoold
+      ```
+
+    > Other distros: `sudo dnf install wtype`, `sudo pacman -S wtype`, etc.
 
 6. **ALSA** (audio capture)
 
@@ -123,8 +140,8 @@ This creates:
 | **Start/Stop** button or **F9** | Toggle continuous listening |
 | **Pause/Resume** button or **F10** | Pause/resume listening |
 | **Model dropdown** | Switch Whisper model (reloads server) |
-| **Auto-type** checkbox | Toggle xdotool/ydotool typing |
-| **Wayland** checkbox | Switch to ydotool for Wayland |
+| **Auto-type** checkbox | Toggle automatic typing into the focused window |
+| **Wayland** checkbox | Use Wayland typing tools (`wtype` or `ydotool`) |
 
 ## 🧠 Models
 
@@ -177,7 +194,7 @@ VoiceKeyboard/
 │   ├── AudioCapture.cs               # arecord PCM streaming (16kHz mono)
 │   ├── WhisperTranscriber.cs         # Python server manager (stdin/stdout IPC)
 │   ├── RealtimeEngine.cs             # Audio pipeline: capture → Python server
-│   └── KeyboardSimulator.cs          # xdotool (X11) / ydotool (Wayland)
+│   └── KeyboardSimulator.cs          # xdotool (X11) / wtype / ydotool (Wayland)
 │
 ├── ViewModels/
 │   └── MainViewModel.cs              # MVVM: state, commands, model selector
@@ -194,13 +211,14 @@ VoiceKeyboard/
 3. **VAD**: Python uses WebRTC VAD (aggressiveness=3) to detect speech start/end
 4. **Buffering**: Speech frames are buffered; trailing silence is included for natural boundaries
 5. **Transcription**: After 300ms of silence, buffered audio is transcribed with faster-whisper
-6. **Typing**: Result text (+ trailing space) is typed via xdotool/ydotool into the focused window
+6. **Typing**: Result text (+ trailing space) is typed via xdotool, `wtype`, or `ydotool` into the focused window
 7. **UI Update**: Transcription appears in the Avalonia UI and speech indicator updates in real-time
 
 ## ❓ Troubleshooting
 
 - **No GPU detected**: Falls back to CPU automatically. Ensure CUDA drivers are installed.
-- **xdotool not working**: You must be on X11. On Wayland, use the "Wayland (ydotool)" checkbox.
+- **xdotool not working**: You must be on X11. On Wayland, check the "Wayland" checkbox and install `wtype` (recommended) or `ydotool` + `ydotoold`.
+- **Wayland typing not working**: Ensure `wtype` or `ydotool` is installed and, for `ydotool`, that `ydotoold` is running (`systemctl status ydotoold`). Note that some compositors (e.g. GNOME) restrict virtual-keyboard access.
 - **Microphone not found**: Check `arecord -l` to verify your mic is visible to ALSA.
 - **Model download fails**: Manually download from [HuggingFace](https://huggingface.co/SYSTRAN) and place in the app directory.
 - **Words merging**: Trailing spaces are auto-added. If still merging, check that xdotool is working.

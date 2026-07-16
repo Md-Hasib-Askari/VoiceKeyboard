@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -34,6 +33,12 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _useWayland;
 
+    partial void OnUseWaylandChanged(bool value)
+    {
+        _settings.UseWayland = value;
+        ConfigService.Save(_settings);
+    }
+
     [ObservableProperty]
     private string _startButtonText = "Start";
 
@@ -56,13 +61,14 @@ public partial class MainViewModel : ObservableObject
     private string _deviceInfo = "Detecting...";
 
     public List<string> AvailableModels { get; } =
-        new() { "tiny.en", "tiny", "base", "small", "medium", "large-v3" };
+        new() { "tiny.en", "tiny", "base", "small", "medium", "large-v3", "turbo" };
 
     public MainViewModel()
     {
         _engine = new RealtimeEngine();
         _settings = ConfigService.Load();
         PythonPath = _settings.PythonPath;
+        UseWayland = _settings.UseWayland;
         _engine.PythonPath = PythonPath;
         _engine.OnTranscription += OnTranscription;
         _engine.OnSpeechStart += () =>
@@ -198,10 +204,19 @@ public partial class MainViewModel : ObservableObject
 
         if (AutoType)
         {
+            string? err;
             if (UseWayland)
-                KeyboardSimulator.TypeTextWayland(text + " ");
+                err = KeyboardSimulator.TypeTextWayland(text + " ");
             else
-                KeyboardSimulator.TypeText(text + " ");
+                err = KeyboardSimulator.TypeText(text + " ");
+
+            if (err != null)
+            {
+                Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    StatusText = $"Typing error: {err}";
+                });
+            }
         }
     }
 

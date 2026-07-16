@@ -1,6 +1,6 @@
 # Project Overview
 
-Voice Keyboard is a real-time speech-to-text application for Linux that acts as a voice keyboard — transcribing speech and typing the result into whichever window has focus. The frontend is **C# / .NET 10 / Avalonia UI** using the **MVVM pattern** with CommunityToolkit.Mvvm. The ML pipeline (VAD + transcription) runs in a **Python subprocess** (`faster-whisper` + `webrtcvad`), communicating with C# via stdin/stdout pipes with near-zero IPC overhead (~0.002ms/frame). Audio capture uses Linux ALSA (`arecord`). Auto-typing uses `xdotool` (X11) or `ydotool` (Wayland).
+Voice Keyboard is a real-time speech-to-text application for Linux that acts as a voice keyboard — transcribing speech and typing the result into whichever window has focus. The frontend is **C# / .NET 10 / Avalonia UI** using the **MVVM pattern** with CommunityToolkit.Mvvm. The ML pipeline (VAD + transcription) runs in a **Python subprocess** (`faster-whisper` + `webrtcvad`), communicating with C# via stdin/stdout pipes with near-zero IPC overhead (~0.002ms/frame). Audio capture uses Linux ALSA (`arecord`). Auto-typing uses `xdotool` (X11) or Wayland tools (`wtype` preferred, `ydotool` as fallback).
 
 # Architecture
 
@@ -28,7 +28,7 @@ arecord (ALSA) → C# AudioCapture → pipe → Python Server → pipe → C# Av
 - `WhisperTranscriber.cs` — Manages Python server lifecycle (start/stop/restart), streams audio in, reads events out
 - `WhisperTranscriber.cs` — Manages Python server lifecycle (start/stop/restart), streams audio in, reads events out; includes `DetectPythonPathAsync()` for auto-detecting the correct Python interpreter
 - `RealtimeEngine.cs` — Glues AudioCapture + WhisperTranscriber together; exposes high-level Start/Stop/Pause/ChangeModel/ChangePythonPath
-- `KeyboardSimulator.cs` — Static helper that shells out to `xdotool type` or `ydotool type`
+- `KeyboardSimulator.cs` — Static helper that shells out to `xdotool type`, `wtype`, or `ydotool type`
 - `transcribe_server.py` — Long-running Python process; reads 960-byte PCM frames from stdin, runs WebRTC VAD + faster-whisper transcription, outputs events to stdout
 - `ConfigService.cs` — Loads/saves user settings (e.g., Python path) to `~/.config/voice-keyboard/settings.json`
 
@@ -57,7 +57,7 @@ chmod +x benchmark.sh
 ./benchmark.sh
 ```
 
-**Runtime dependencies:** `python3` with `faster-whisper` and `webrtcvad`, `arecord` (alsa-utils), `xdotool` (X11) or `ydotool` (Wayland), NVIDIA CUDA drivers (optional, for GPU acceleration).
+**Runtime dependencies:** `python3` with `faster-whisper` and `webrtcvad`, `arecord` (alsa-utils), `xdotool` (X11) or `wtype`/`ydotool` (Wayland), NVIDIA CUDA drivers (optional, for GPU acceleration).
 
 **No automated test suite exists.** Testing is manual via the UI or the benchmark script.
 

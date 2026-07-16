@@ -7,6 +7,7 @@ namespace VoiceKeyboard.Services;
 public class AppSettings
 {
     public string PythonPath { get; set; } = "python3";
+    public bool UseWayland { get; set; }
 }
 
 public static class ConfigService

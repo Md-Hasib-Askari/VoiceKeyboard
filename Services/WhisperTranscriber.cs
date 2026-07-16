@@ -13,6 +13,7 @@ public class WhisperTranscriber : IAsyncDisposable
     private bool _initialized;
     private string _currentModel = "small";
     private string _currentPythonPath = "python3";
+    private string _currentLanguage = "en";
 
     public string CurrentModel => _currentModel;
 
@@ -23,9 +24,10 @@ public class WhisperTranscriber : IAsyncDisposable
     public event Action<string>? OnError;
     public event Action<string>? OnDeviceDetected;
 
-    public async Task InitializeAsync(string model = "small", string pythonPath = "python3")
+    public async Task InitializeAsync(string model = "small", string pythonPath = "python3", string? language = null)
     {
-        if (_initialized && _currentModel == model && _currentPythonPath == pythonPath)
+        language ??= _currentLanguage;
+        if (_initialized && _currentModel == model && _currentPythonPath == pythonPath && _currentLanguage == language)
             return;
 
         // Stop existing server if running
@@ -34,6 +36,7 @@ public class WhisperTranscriber : IAsyncDisposable
             await DisposeAsync();
         }
 
+        _currentLanguage = language;
         _currentModel = model;
         _currentPythonPath = pythonPath;
 
@@ -42,7 +45,7 @@ public class WhisperTranscriber : IAsyncDisposable
         var psi = new ProcessStartInfo
         {
             FileName = pythonPath,
-            Arguments = $"-u \"{scriptPath}\" {model}",
+            Arguments = $"-u \"{scriptPath}\" {model} {language}",
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,

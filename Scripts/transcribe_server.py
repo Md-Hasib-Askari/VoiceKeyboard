@@ -18,6 +18,7 @@ MIN_SPEECH_DURATION = 0.3
 
 def main():
     model_name = sys.argv[1] if len(sys.argv) > 1 else "small"
+    language = "en"
     
     sys.stdout.reconfigure(line_buffering=True)
     
@@ -77,8 +78,11 @@ def main():
                         audio_file = io.BytesIO(wav_data)
                         segments, info = model.transcribe(
                             audio_file,
-                            language="en",
+                            language=language,
                             beam_size=1,
+                            temperature=[0.0],
+                            compression_ratio_threshold=2.4,
+                            condition_on_previous_text=False,
                             vad_filter=False,
                         )
                         text = " ".join(s.text for s in segments).strip()

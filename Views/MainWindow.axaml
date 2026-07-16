@@ -104,7 +104,7 @@
                 <CheckBox Content="Auto-type text"
                           IsChecked="{Binding AutoType}"
                           Foreground="#cdd6f4" />
-                <CheckBox Content="Wayland (ydotool)"
+                <CheckBox Content="Wayland"
                           IsChecked="{Binding UseWayland}"
                           Foreground="#cdd6f4" />
             </StackPanel>

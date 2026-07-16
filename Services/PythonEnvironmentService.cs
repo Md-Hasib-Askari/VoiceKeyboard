@@ -46,9 +46,11 @@ public static class PythonEnvironmentService
             Console.WriteLine("[PythonEnv] Venv created");
         }
 
-        // Step 3: Install packages
-        // Install torch/torchaudio from CUDA wheel index first (only if not already installed)
+        // Step 3: Install packages (skip if already present)
         bool torchInstalled = await CheckPackageInstalledAsync(uvPath, VenvPython, "torch");
+        bool whisperInstalled = await CheckPackageInstalledAsync(uvPath, VenvPython, "faster-whisper");
+        bool vadInstalled = await CheckPackageInstalledAsync(uvPath, VenvPython, "webrtcvad");
+
         if (!torchInstalled)
         {
             onStatus?.Invoke("📦 Installing PyTorch with CUDA (large download, ~2.5GB)...");
@@ -64,14 +66,22 @@ public static class PythonEnvironmentService
             Console.WriteLine("[PythonEnv] torch already installed, skipping");
         }
 
-        onStatus?.Invoke("📦 Installing Python packages...");
-        Console.WriteLine("[PythonEnv] Installing packages...");
-        await RunProcessAsync(
-            uvPath,
-            $"pip install -r \"{RequirementsPath}\" --python \"{VenvPython}\"",
-            120
-        );
-        Console.WriteLine("[PythonEnv] Packages installed");
+        if (!whisperInstalled || !vadInstalled)
+        {
+            onStatus?.Invoke("📦 Installing Python packages...");
+            Console.WriteLine("[PythonEnv] Installing packages...");
+            await RunProcessAsync(
+                uvPath,
+                $"pip install -r \"{RequirementsPath}\" --python \"{VenvPython}\"",
+                120
+            );
+            Console.WriteLine("[PythonEnv] Packages installed");
+        }
+        else
+        {
+            Console.WriteLine("[PythonEnv] packages already installed, skipping");
+            onStatus?.Invoke("✅ Python environment ready");
+        }
 
         return VenvPython;
     }
