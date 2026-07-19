@@ -7,10 +7,6 @@ namespace VoiceKeyboard.Services;
 
 public static class KeyboardSimulator
 {
-    /// <summary>
-    /// Types text via xdotool (X11). Falls back to Wayland tools if detected.
-    /// Returns null on success, or an error message on failure.
-    /// </summary>
     public static string? TypeText(string text)
     {
         if (string.IsNullOrEmpty(text))
@@ -27,10 +23,6 @@ public static class KeyboardSimulator
         return null;
     }
 
-    /// <summary>
-    /// Types text on Wayland via wtype (preferred) or ydotool.
-    /// Returns null on success, or an error message on failure.
-    /// </summary>
     public static string? TypeTextWayland(string text)
     {
         if (string.IsNullOrEmpty(text))
@@ -40,23 +32,46 @@ public static class KeyboardSimulator
 
         if (CommandExists("wtype"))
         {
+            Console.WriteLine("[Keyboard] Trying wtype...");
             var err = TryTypeWithWtype(text);
             if (err == null)
+            {
+                Console.WriteLine("[Keyboard] wtype succeeded");
                 return null;
+            }
+            Console.WriteLine($"[Keyboard] wtype failed: {err}");
             lastError = err;
         }
 
         if (CommandExists("ydotool"))
         {
+            Console.WriteLine("[Keyboard] Trying ydotool...");
             var err = TryTypeWithYdotool(text);
             if (err == null)
+            {
+                Console.WriteLine("[Keyboard] ydotool succeeded");
                 return null;
+            }
+            Console.WriteLine($"[Keyboard] ydotool failed: {err}");
             lastError = err;
         }
 
-        return lastError ?? "Install a Wayland typing tool:\n" +
-               "  sudo apt install wtype\n" +
-               "(or) sudo apt install ydotool ydotoold && ydotoold &";
+        if (CommandExists("xdotool"))
+        {
+            Console.WriteLine("[Keyboard] Trying xdotool...");
+            var err = RunProcess("xdotool", new[] { "type", "--", text });
+            if (err == null)
+            {
+                Console.WriteLine("[Keyboard] xdotool succeeded");
+                return null;
+            }
+            Console.WriteLine($"[Keyboard] xdotool failed: {err}");
+            lastError = err;
+        }
+
+        return lastError ?? "No typing tool found. Install one:\n" +
+               "  sudo apt install xdotool   (works via XWayland)\n" +
+               "  sudo apt install wtype     (wlroots Wayland)";
     }
 
     private static string? TryTypeWithWtype(string text)
@@ -71,16 +86,42 @@ public static class KeyboardSimulator
     {
         if (!IsYdotooldRunning())
         {
-            if (!StartYdotoold())
-                return "ydotoold could not be started.\nInstall: sudo apt install ydotool ydotoold";
+            RemoveStaleSockets();
 
-            System.Threading.Thread.Sleep(200);
+            if (!StartYdotoold())
+            {
+                if (!CanAccessUinput() && !IsInInputGroup())
+                    return "Not in 'input' group. Log out and back in.";
+                return "ydotoold could not start.";
+            }
+
+            System.Threading.Thread.Sleep(400);
         }
 
-        var err = RunProcess("ydotool", new[] { "type", text }, ydotoolSocket: FindYdotoolSocket());
+        if (!IsYdotooldRunning())
+            return "ydotoold is not running.";
+
+        var socket = FindYdotoolSocket();
+        if (string.IsNullOrEmpty(socket))
+            return "ydotoold socket not found.";
+
+        var err = RunProcess("ydotool", new[] { "type", text }, ydotoolSocket: socket);
         if (err != null)
             return $"ydotool failed: {err}";
         return null;
+    }
+
+    private static bool CanAccessUinput()
+    {
+        try
+        {
+            using var fs = new FileStream("/dev/uinput", FileMode.Open, FileAccess.Write);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static string? RunProcess(string fileName, string[] args, string? ydotoolSocket = null)
@@ -217,10 +258,53 @@ public static class KeyboardSimulator
         }
     }
 
+    private static bool IsInInputGroup()
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "groups",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            using var process = Process.Start(psi);
+            if (process == null) return false;
+            process.WaitForExit(1000);
+            var output = process.StandardOutput.ReadToEnd();
+            return output.Contains("input");
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void RemoveStaleSockets()
+    {
+        var candidates = new[]
+        {
+            Path.Combine("/tmp", ".ydotool_socket"),
+        };
+
+        var runtimeDir = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
+        if (!string.IsNullOrEmpty(runtimeDir))
+        {
+            candidates = candidates.Append(Path.Combine(runtimeDir, ".ydotool_socket")).ToArray();
+        }
+
+        foreach (var candidate in candidates)
+        {
+            try { File.Delete(candidate); } catch { }
+        }
+    }
+
     private static string? FindYdotoolSocket()
     {
-        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("YDOTOOL_SOCKET")))
-            return null;
+        var envSocket = Environment.GetEnvironmentVariable("YDOTOOL_SOCKET");
+        if (!string.IsNullOrEmpty(envSocket) && File.Exists(envSocket))
+            return envSocket;
 
         var runtimeDir = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
         var uid = Environment.GetEnvironmentVariable("UID");
@@ -242,23 +326,81 @@ public static class KeyboardSimulator
 
     private static bool StartYdotoold()
     {
+        // Try direct launch first
+        if (LaunchYdotooldDirect("ydotoold"))
+            return true;
+
+        Console.WriteLine("[Keyboard] ydotoold direct failed — trying via sg input...");
+
+        // Try with sg to pick up the input group
+        if (LaunchYdotooldViaSg())
+            return true;
+
+        return false;
+    }
+
+    private static bool LaunchYdotooldDirect(string command)
+    {
         try
         {
             var psi = new ProcessStartInfo
             {
-                FileName = "ydotoold",
+                FileName = command,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true,
             };
-            using var process = System.Diagnostics.Process.Start(psi);
+
+            using var process = Process.Start(psi);
             if (process == null)
                 return false;
-            // Let it run for a moment
-            System.Threading.Thread.Sleep(150);
-            return !process.HasExited;
+
+            System.Threading.Thread.Sleep(300);
+            if (process.HasExited)
+            {
+                var err = process.StandardError.ReadToEnd();
+                Console.WriteLine($"[Keyboard] {command} exited: {err}");
+                return false;
+            }
+
+            return true;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"[Keyboard] {command} launch failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    private static bool LaunchYdotooldViaSg()
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "bash",
+                Arguments = "-c \"sg input -c 'ydotoold &>/dev/null &'\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+
+            using var process = Process.Start(psi);
+            if (process == null)
+                return false;
+
+            process.WaitForExit(5000);
+
+            System.Threading.Thread.Sleep(500);
+            var running = IsYdotooldRunning();
+            Console.WriteLine($"[Keyboard] sg input launch: ydotoold running={running}");
+            return running;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Keyboard] sg input launch failed: {ex.Message}");
             return false;
         }
     }
