@@ -23,6 +23,7 @@ public static class PythonEnvironmentService
 
     private static readonly string VenvDir = Path.Combine(DataDir, "venv");
     private static readonly string VenvPython = Path.Combine(VenvDir, "bin", "python3");
+    private static readonly string SetupCompleteFile = Path.Combine(VenvDir, ".setup-complete");
     private static readonly string RequirementsPath = Path.Combine(
         AppContext.BaseDirectory,
         "Scripts",
@@ -34,6 +35,13 @@ public static class PythonEnvironmentService
 
     public static async Task<string> EnsureEnvironmentAsync(Action<string>? onStatus = null)
     {
+        if (VenvExists && File.Exists(SetupCompleteFile))
+        {
+            Console.WriteLine("[PythonEnv] Environment already set up, skipping");
+            onStatus?.Invoke("✅ Python environment ready");
+            return VenvPython;
+        }
+
         // Step 1: Ensure uv is available
         var uvPath = await EnsureUvInstalledAsync(onStatus);
 
@@ -80,9 +88,12 @@ public static class PythonEnvironmentService
         else
         {
             Console.WriteLine("[PythonEnv] packages already installed, skipping");
-            onStatus?.Invoke("✅ Python environment ready");
         }
 
+        File.WriteAllText(SetupCompleteFile, DateTime.UtcNow.ToString("O"));
+        Console.WriteLine("[PythonEnv] Setup complete marker written");
+
+        onStatus?.Invoke("✅ Python environment ready");
         return VenvPython;
     }
 
