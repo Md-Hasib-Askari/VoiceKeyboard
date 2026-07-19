@@ -198,6 +198,26 @@ public class WhisperTranscriber : IAsyncDisposable
         }
     }
 
+    public void DisposeSync()
+    {
+        _initialized = false;
+        try
+        {
+            if (_pythonProcess != null && !_pythonProcess.HasExited)
+            {
+                _pythonProcess.StandardInput.Close();
+                _pythonProcess.Kill();
+                _pythonProcess.WaitForExit(3000);
+            }
+        }
+        catch { }
+        finally
+        {
+            _pythonProcess?.Dispose();
+            _pythonProcess = null;
+        }
+    }
+
     public static async Task<string> DetectPythonPathAsync(Action<string>? onStatus = null)
     {
         // Use uv-managed venv — independent of conda/pyenv
