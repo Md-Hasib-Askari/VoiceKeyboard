@@ -64,10 +64,43 @@ fi
 # Update desktop database
 update-desktop-database "$APP_APPS_DIR" 2>/dev/null || true
 
+# --- Register global keyboard shortcut ---
+echo ""
+echo "Registering global hotkey Super+F9..."
+
+if command -v gsettings &>/dev/null && gsettings get org.gnome.settings-daemon.plugins.media-keys &>/dev/null 2>&1; then
+  KEYBINDING_PATH="/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/"
+  gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:"$KEYBINDING_PATH" name "Voice Keyboard"
+  gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:"$KEYBINDING_PATH" command "$APP_DIR/VoiceKeyboard --toggle-visibility"
+  gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:"$KEYBINDING_PATH" binding '<Super>F9'
+
+  current=$(gsettings get org.gnome.settings-daemon.plugins.media-keys custom-keybindings)
+  if echo "$current" | grep -q "@as \[\]"; then
+    gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings "['$KEYBINDING_PATH']"
+  elif ! echo "$current" | grep -q "custom0/"; then
+    gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings "['$KEYBINDING_PATH', ${current:1}"
+  fi
+  echo "✅ Registered Super+F9 (GNOME)"
+elif command -v kwriteconfig5 &>/dev/null; then
+  kwriteconfig5 --file kglobalshortcutsrc --group "Voice Keyboard" --key "_launch" "Meta+F9,none,Launch Voice Keyboard"
+  kwriteconfig5 --file kglobalshortcutsrc --group "Voice Keyboard" --key "_k_friendly_name" "Voice Keyboard"
+  kglobalaccel5 --replace &>/dev/null || true
+  echo "✅ Registered Meta+F9 (KDE)"
+else
+  echo "⚠️  Could not auto-register global hotkey for your desktop environment."
+  echo "   To use the global hotkey, manually bind Super+F9 to:"
+  echo "     $APP_DIR/VoiceKeyboard --toggle-visibility"
+  echo ""
+  echo "   GNOME: Settings → Keyboard → Keyboard Shortcuts → Custom Shortcuts"
+  echo "   KDE:   System Settings → Shortcuts → Custom Shortcuts"
+  echo "   Sway:  bindsym Mod4+F9 exec $APP_DIR/VoiceKeyboard --toggle-visibility"
+  echo "   Hyprland: bind = SUPER, F9, exec, $APP_DIR/VoiceKeyboard --toggle-visibility"
+fi
+
+echo ""
 echo "✅ Voice Keyboard installed!"
 echo ""
-echo "Open it from:"
-echo "  🖥️  Desktop shortcut"
+echo "  🎤 Super+F9 — Launch / toggle Voice Keyboard from anywhere"
 echo "  🔍 App launcher → search 'Voice Keyboard'"
 echo ""
 echo "To uninstall:"
