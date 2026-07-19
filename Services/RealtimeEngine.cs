@@ -50,7 +50,7 @@ public class RealtimeEngine : IAsyncDisposable
         };
     }
 
-    public async Task InitializeAsync(string model = "small")
+    public async Task InitializeAsync(string model = "turbo")
     {
         await _transcriber.InitializeAsync(model, PythonPath);
     }

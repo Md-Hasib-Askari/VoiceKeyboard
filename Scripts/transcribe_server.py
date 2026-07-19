@@ -22,7 +22,7 @@ HALLUCINATIONS = {
 }
 
 def main():
-    model_name = sys.argv[1] if len(sys.argv) > 1 else "small"
+    model_name = sys.argv[1] if len(sys.argv) > 1 else "turbo"
     language = "en"
     
     sys.stdout.reconfigure(line_buffering=True)

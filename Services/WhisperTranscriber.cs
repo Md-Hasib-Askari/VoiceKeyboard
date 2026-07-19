@@ -11,7 +11,7 @@ public class WhisperTranscriber : IAsyncDisposable
 {
     private Process? _pythonProcess;
     private bool _initialized;
-    private string _currentModel = "small";
+    private string _currentModel = "turbo";
     private string _currentPythonPath = "python3";
     private string _currentLanguage = "en";
 
@@ -24,7 +24,7 @@ public class WhisperTranscriber : IAsyncDisposable
     public event Action<string>? OnError;
     public event Action<string>? OnDeviceDetected;
 
-    public async Task InitializeAsync(string model = "small", string pythonPath = "python3", string? language = null)
+    public async Task InitializeAsync(string model = "turbo", string pythonPath = "python3", string? language = null)
     {
         language ??= _currentLanguage;
         if (_initialized && _currentModel == model && _currentPythonPath == pythonPath && _currentLanguage == language)

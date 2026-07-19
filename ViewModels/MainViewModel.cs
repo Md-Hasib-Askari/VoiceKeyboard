@@ -49,7 +49,7 @@ public partial class MainViewModel : ObservableObject
     private bool _isSpeechDetected;
 
     [ObservableProperty]
-    private string _selectedModel = "small";
+    private string _selectedModel = "turbo";
 
     [ObservableProperty]
     private string _pythonPath = "python3";
