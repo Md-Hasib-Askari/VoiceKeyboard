@@ -3,112 +3,69 @@
         xmlns:vm="using:VoiceKeyboard.ViewModels"
         x:Class="VoiceKeyboard.Views.MainWindow"
         x:DataType="vm:MainViewModel"
-        Title="Voice Keyboard - Whisper"
-        Width="520" Height="500"
+        Title="Voice Keyboard"
+        Width="360" Height="116"
         WindowStartupLocation="CenterScreen"
-        CanResize="True"
-        MinWidth="480" MinHeight="460">
+        CanResize="False"
+        Topmost="True"
+        Background="Transparent"
+        TransparencyLevelHint="None">
 
     <Design.DataContext>
         <vm:MainViewModel />
     </Design.DataContext>
 
-    <Border Background="#1e1e2e" Padding="20" CornerRadius="8">
-        <StackPanel Spacing="12" VerticalAlignment="Center">
+    <Border Background="#0d1117" CornerRadius="8" Padding="10,8">
+        <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto">
 
-            <!-- Status + Speech Indicator -->
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
-                <Ellipse Width="14" Height="14"
-                         Fill="#f38ba8"
-                         IsVisible="{Binding IsSpeechDetected}" />
-                <Ellipse Width="14" Height="14"
-                         Fill="#585b70"
-                         IsVisible="{Binding !IsSpeechDetected}" />
+            <!-- Row 0: Audio bar + transcription -->
+            <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Spacing="4" Margin="0,0,0,4">
+                <Grid Height="4">
+                    <Border Background="#161b22" CornerRadius="2" />
+                    <Border Background="#3fb950" CornerRadius="2" HorizontalAlignment="Left"
+                            Width="340" RenderTransformOrigin="0,0.5">
+                        <Border.RenderTransform>
+                            <ScaleTransform ScaleX="{Binding AudioLevel}" />
+                        </Border.RenderTransform>
+                    </Border>
+                </Grid>
+                <TextBlock Text="{Binding LastTranscription}"
+                           Foreground="#c9d1d9" FontSize="11"
+                           TextWrapping="NoWrap"
+                           TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+
+            <!-- Row 1: Status + button -->
+            <StackPanel Grid.Row="1" Grid.Column="0"
+                        Orientation="Horizontal" Spacing="5"
+                        VerticalAlignment="Center">
+                <Ellipse Width="6" Height="6"
+                         Fill="#3fb950" IsVisible="{Binding IsListening}" />
+                <Ellipse Width="6" Height="6"
+                         Fill="#30363d" IsVisible="{Binding !IsListening}" />
                 <TextBlock Text="{Binding StatusText}"
-                           Foreground="#cdd6f4"
-                           FontSize="16"
-                           TextWrapping="Wrap"
+                           Foreground="#8b949e" FontSize="10"
                            VerticalAlignment="Center" />
             </StackPanel>
 
-            <!-- Last Transcription -->
-            <Border Background="#313244" CornerRadius="6" Padding="12" MinHeight="60" MaxHeight="100">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <TextBlock Text="{Binding LastTranscription}"
-                               Foreground="#a6e3a1"
-                               FontSize="14"
-                               TextWrapping="Wrap" />
-                </ScrollViewer>
-            </Border>
+            <Button Grid.Row="1" Grid.Column="1"
+                    Content="{Binding StartButtonText}"
+                    Command="{Binding ToggleStartCommand}"
+                    IsEnabled="{Binding IsReady}"
+                    Padding="10,1" FontSize="10"
+                    CornerRadius="3"
+                    Foreground="#ffffff"
+                    Background="#238636"
+                    VerticalAlignment="Center" />
 
-            <!-- Buttons -->
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
-                <Button Content="{Binding StartButtonText}"
-                        Command="{Binding ToggleStartCommand}"
-                        IsEnabled="{Binding IsReady}"
-                        Padding="24 10"
-                        CornerRadius="6"
-                        Foreground="#1e1e2e"
-                        Background="#89b4fa" />
-                <Button Content="{Binding PauseButtonText}"
-                        Command="{Binding TogglePauseCommand}"
-                        IsEnabled="{Binding IsListening}"
-                        Padding="24 10"
-                        CornerRadius="6"
-                        Foreground="#1e1e2e"
-                        Background="#f9e2af" />
-            </StackPanel>
+            <!-- Row 2: Shortcuts -->
+            <TextBlock Grid.Row="2" Grid.ColumnSpan="2"
+                       Text="F9 Start / Stop  ·  Super+F9 Launch"
+                       Foreground="#484f58" FontSize="9"
+                       HorizontalAlignment="Center"
+                       Margin="0,3,0,0" />
 
-            <!-- Model Selector -->
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
-                <TextBlock Text="Model:"
-                           Foreground="#a6adc8"
-                           FontSize="13"
-                           VerticalAlignment="Center" />
-                <ComboBox ItemsSource="{Binding AvailableModels}"
-                          SelectedItem="{Binding SelectedModel}"
-                          MinWidth="140"
-                          FontSize="13" />
-            </StackPanel>
-
-            <!-- Device Info -->
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6">
-                <TextBlock Text="{Binding DeviceInfo}"
-                           Foreground="#94e2d5"
-                           FontSize="12" />
-            </StackPanel>
-
-            <!-- Python Path (scrollable for long paths) -->
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6">
-                <TextBlock Text="Python:" Foreground="#a6adc8" FontSize="13"
-                           VerticalAlignment="Center" />
-                <ScrollViewer HorizontalScrollBarVisibility="Auto" MaxWidth="340">
-                    <TextBox Text="{Binding PythonPath}"
-                             MinWidth="200"
-                             FontSize="13"
-                             TextWrapping="NoWrap"
-                             AcceptsReturn="False"
-                             IsEnabled="{Binding !IsDetectingPython}" />
-                </ScrollViewer>
-                <Button Content="🔍"
-                        Command="{Binding AutoDetectPythonCommand}"
-                        IsEnabled="{Binding !IsDetectingPython}"
-                        Padding="8 4"
-                        CornerRadius="4"
-                        FontSize="13"
-                        ToolTip.Tip="Auto-detect Python with webrtcvad" />
-            </StackPanel>
-
-            <!-- Options -->
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="20">
-                <CheckBox Content="Auto-type text"
-                          IsChecked="{Binding AutoType}"
-                          Foreground="#cdd6f4" />
-                <CheckBox Content="Wayland"
-                          IsChecked="{Binding UseWayland}"
-                          Foreground="#cdd6f4" />
-            </StackPanel>
-
-        </StackPanel>
+        </Grid>
     </Border>
+
 </Window>

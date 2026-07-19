@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -13,16 +12,13 @@ public partial class MainViewModel : ObservableObject
     private readonly AppSettings _settings;
 
     [ObservableProperty]
-    private string _statusText = "Initializing Whisper model...";
+    private string _statusText = "Initializing...";
 
     [ObservableProperty]
-    private string _lastTranscription = "No transcription yet.";
+    private string _lastTranscription = "";
 
     [ObservableProperty]
     private bool _isListening;
-
-    [ObservableProperty]
-    private bool _isPaused;
 
     [ObservableProperty]
     private bool _isReady;
@@ -31,25 +27,10 @@ public partial class MainViewModel : ObservableObject
     private bool _autoType = true;
 
     [ObservableProperty]
-    private bool _useWayland;
-
-    partial void OnUseWaylandChanged(bool value)
-    {
-        _settings.UseWayland = value;
-        ConfigService.Save(_settings);
-    }
-
-    [ObservableProperty]
     private string _startButtonText = "Start";
 
     [ObservableProperty]
-    private string _pauseButtonText = "Pause";
-
-    [ObservableProperty]
     private bool _isSpeechDetected;
-
-    [ObservableProperty]
-    private string _selectedModel = "turbo";
 
     [ObservableProperty]
     private string _pythonPath = "python3";
@@ -60,21 +41,32 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _deviceInfo = "Detecting...";
 
-    public List<string> AvailableModels { get; } =
-        new() { "tiny.en", "tiny", "base", "small", "medium", "large-v3", "turbo" };
+    [ObservableProperty]
+    private float _audioLevel;
+
+    partial void OnPythonPathChanged(string value)
+    {
+        if (_engine.PythonPath == value)
+            return;
+        _settings.PythonPath = value;
+        ConfigService.Save(_settings);
+        _engine.PythonPath = value;
+    }
 
     public MainViewModel()
     {
         _engine = new RealtimeEngine();
         _settings = ConfigService.Load();
         PythonPath = _settings.PythonPath;
-        UseWayland = _settings.UseWayland;
         _engine.PythonPath = PythonPath;
+
         _engine.OnTranscription += OnTranscription;
         _engine.OnSpeechStart += () =>
             Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => IsSpeechDetected = true);
         _engine.OnSpeechEnd += () =>
             Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => IsSpeechDetected = false);
+        _engine.OnAudioLevel += level =>
+            Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => AudioLevel = level);
         _engine.OnDeviceDetected += device =>
             Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => DeviceInfo = device);
         _engine.OnStatusChanged += status =>
@@ -89,7 +81,7 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
-            StatusText = "🔍 Setting up Python environment...";
+            StatusText = "Setting up Python environment...";
             var venvPython = await WhisperTranscriber.DetectPythonPathAsync(status =>
                 Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => StatusText = status)
             );
@@ -97,11 +89,10 @@ public partial class MainViewModel : ObservableObject
             _engine.PythonPath = PythonPath;
             _settings.PythonPath = PythonPath;
             ConfigService.Save(_settings);
-            Console.WriteLine($"[ViewModel] Python ready: {PythonPath}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ViewModel] Python environment setup failed: {ex.Message}");
+            Console.WriteLine($"[ViewModel] Python setup failed: {ex.Message}");
         }
         finally
         {
@@ -110,47 +101,13 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
-            await _engine.InitializeAsync(SelectedModel);
+            await _engine.InitializeAsync();
             IsReady = true;
-            StatusText = "Ready. Press Start (F9) to listen continuously.";
+            StatusText = "Idle";
         }
         catch (Exception ex)
         {
             StatusText = $"Init failed: {ex.Message}";
-        }
-    }
-
-    partial void OnPythonPathChanged(string value)
-    {
-        if (_engine.PythonPath == value)
-            return;
-        _settings.PythonPath = value;
-        ConfigService.Save(_settings);
-        IsReady = false;
-        _ = _engine.ChangePythonPathAsync(value);
-        IsReady = true;
-    }
-
-    partial void OnSelectedModelChanged(string value)
-    {
-        if (!IsReady)
-            return;
-        IsReady = false;
-        _ = ChangeModelAsync(value);
-    }
-
-    private async System.Threading.Tasks.Task ChangeModelAsync(string model)
-    {
-        try
-        {
-            await _engine.ChangeModelAsync(model);
-            IsReady = true;
-            StatusText = $"Ready. Model: {model}";
-        }
-        catch (Exception ex)
-        {
-            StatusText = $"Model change failed: {ex.Message}";
-            IsReady = true;
         }
     }
 
@@ -160,7 +117,6 @@ public partial class MainViewModel : ObservableObject
         if (IsListening)
         {
             IsListening = false;
-            IsPaused = false;
             IsSpeechDetected = false;
             _engine.StopListening();
             StartButtonText = "Start";
@@ -168,30 +124,8 @@ public partial class MainViewModel : ObservableObject
         else
         {
             IsListening = true;
-            IsPaused = false;
             _engine.StartListening();
             StartButtonText = "Stop";
-        }
-    }
-
-    [RelayCommand]
-    private void TogglePause()
-    {
-        if (!IsListening)
-            return;
-
-        if (IsPaused)
-        {
-            IsPaused = false;
-            _engine.ResumeListening();
-            PauseButtonText = "Pause";
-        }
-        else
-        {
-            IsPaused = true;
-            IsSpeechDetected = false;
-            _engine.PauseListening();
-            PauseButtonText = "Resume";
         }
     }
 
@@ -204,18 +138,25 @@ public partial class MainViewModel : ObservableObject
 
         if (AutoType)
         {
+            Console.WriteLine($"[ViewModel] AutoType=true, IsWayland={KeyboardSimulator.IsWayland()}, text='{text}'");
+
             string? err;
-            if (UseWayland)
+            if (KeyboardSimulator.IsWayland())
                 err = KeyboardSimulator.TypeTextWayland(text + " ");
             else
                 err = KeyboardSimulator.TypeText(text + " ");
 
             if (err != null)
             {
+                Console.WriteLine($"[ViewModel] Typing error: {err}");
                 Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                 {
-                    StatusText = $"Typing error: {err}";
+                    StatusText = $"! {err}";
                 });
+            }
+            else
+            {
+                Console.WriteLine($"[ViewModel] Typed successfully: '{text}'");
             }
         }
     }
@@ -235,5 +176,11 @@ public partial class MainViewModel : ObservableObject
         {
             IsDetectingPython = false;
         }
+    }
+
+    public void DisposeSync()
+    {
+        _engine.StopListening();
+        _engine.DisposeSync();
     }
 }

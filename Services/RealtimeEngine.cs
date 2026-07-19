@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace VoiceKeyboard.Services;
@@ -15,10 +14,10 @@ public class RealtimeEngine : IAsyncDisposable
     public event Action<string>? OnTranscription;
     public event Action? OnSpeechStart;
     public event Action? OnSpeechEnd;
+    public event Action<float>? OnAudioLevel;
     public event Action<string>? OnDeviceDetected;
     public event Action<string>? OnStatusChanged;
 
-    public string CurrentModel => _transcriber.CurrentModel;
     public string PythonPath { get; set; } = "python3";
 
     public RealtimeEngine()
@@ -43,6 +42,14 @@ public class RealtimeEngine : IAsyncDisposable
         };
         _transcriber.OnDeviceDetected += device => OnDeviceDetected?.Invoke(device);
 
+        _capture.OnAudioLevel += level =>
+        {
+            if (_isListening && !_isPaused)
+                OnAudioLevel?.Invoke(level);
+            else
+                OnAudioLevel?.Invoke(0f);
+        };
+
         _capture.OnAudioFrame += frame =>
         {
             if (!_isPaused && _isListening)
@@ -50,36 +57,9 @@ public class RealtimeEngine : IAsyncDisposable
         };
     }
 
-    public async Task InitializeAsync(string model = "turbo")
+    public async Task InitializeAsync()
     {
-        await _transcriber.InitializeAsync(model, PythonPath);
-    }
-
-    public async Task ChangeModelAsync(string model)
-    {
-        var wasListening = _isListening;
-        var wasPaused = _isPaused;
-
-        if (wasListening)
-        {
-            _capture.Stop();
-            _isListening = false;
-        }
-
-        OnStatusChanged?.Invoke($"🔄 Loading {model}...");
-        await _transcriber.InitializeAsync(model, PythonPath);
-
-        if (wasListening)
-        {
-            _isListening = true;
-            _isPaused = wasPaused;
-            _capture.Start();
-            OnStatusChanged?.Invoke("🔴 Listening...");
-        }
-        else
-        {
-            OnStatusChanged?.Invoke($"Ready. Model: {model}");
-        }
+        await _transcriber.InitializeAsync("turbo", PythonPath);
     }
 
     public void StartListening()
@@ -87,20 +67,20 @@ public class RealtimeEngine : IAsyncDisposable
         _isPaused = false;
         _isListening = true;
         _capture.Start();
-        OnStatusChanged?.Invoke("🔴 Listening...");
+        OnStatusChanged?.Invoke("Listening");
     }
 
     public void PauseListening()
     {
         _isPaused = true;
         OnSpeechEnd?.Invoke();
-        OnStatusChanged?.Invoke("⏸ Paused");
+        OnStatusChanged?.Invoke("Paused");
     }
 
     public void ResumeListening()
     {
         _isPaused = false;
-        OnStatusChanged?.Invoke("🔴 Listening...");
+        OnStatusChanged?.Invoke("Listening");
     }
 
     public void StopListening()
@@ -109,35 +89,14 @@ public class RealtimeEngine : IAsyncDisposable
         _isPaused = false;
         _capture.Stop();
         OnSpeechEnd?.Invoke();
-        OnStatusChanged?.Invoke("⏹ Stopped");
+        OnStatusChanged?.Invoke("Idle");
     }
 
-    public async Task ChangePythonPathAsync(string pythonPath)
+    public void DisposeSync()
     {
-        PythonPath = pythonPath;
-        var wasListening = _isListening;
-        var wasPaused = _isPaused;
-
-        if (wasListening)
-        {
-            _capture.Stop();
-            _isListening = false;
-        }
-
-        OnStatusChanged?.Invoke($"🔄 Restarting with Python: {pythonPath}...");
-        await _transcriber.InitializeAsync(CurrentModel, PythonPath);
-
-        if (wasListening)
-        {
-            _isListening = true;
-            _isPaused = wasPaused;
-            _capture.Start();
-            OnStatusChanged?.Invoke("🔴 Listening...");
-        }
-        else
-        {
-            OnStatusChanged?.Invoke($"Ready. Model: {CurrentModel}");
-        }
+        _isListening = false;
+        _capture.Dispose();
+        _transcriber.DisposeSync();
     }
 
     public async ValueTask DisposeAsync()

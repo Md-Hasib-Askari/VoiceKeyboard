@@ -13,8 +13,8 @@ public class AudioCapture : IDisposable
     private bool _isRunning;
 
     public event Action<byte[]>? OnAudioFrame;
+    public event Action<float>? OnAudioLevel;
 
-    // 480 samples * 2 bytes (16-bit) = 960 bytes = 30ms at 16kHz
     private const int FrameSize = 960;
 
     public bool IsRunning => _isRunning;
@@ -44,7 +44,6 @@ public class AudioCapture : IDisposable
             Process.Start(psi) ?? throw new InvalidOperationException("Failed to start arecord");
 
         _ = CaptureLoopAsync(_cts!.Token);
-        Console.WriteLine("[AudioCapture] arecord started");
     }
 
     private async Task CaptureLoopAsync(CancellationToken ct)
@@ -69,9 +68,11 @@ public class AudioCapture : IDisposable
                 }
 
                 var frame = buffer.ToArray();
+
+                var level = ComputeRms(frame);
+                OnAudioLevel?.Invoke(level);
+
                 OnAudioFrame?.Invoke(frame);
-                if (DateTime.Now.Millisecond < 100) // ~1 log/sec
-                    Console.WriteLine($"[AudioCapture] Frame sent, {frame.Length} bytes");
             }
         }
         catch (OperationCanceledException) { }
@@ -79,6 +80,19 @@ public class AudioCapture : IDisposable
         {
             Console.WriteLine($"[AudioCapture] Error: {ex.Message}");
         }
+    }
+
+    private static float ComputeRms(byte[] pcm16)
+    {
+        long sum = 0;
+        for (int i = 0; i < pcm16.Length; i += 2)
+        {
+            var sample = (short)(pcm16[i] | (pcm16[i + 1] << 8));
+            sum += sample * sample;
+        }
+
+        var rms = Math.Sqrt((double)sum / (pcm16.Length / 2));
+        return Math.Clamp((float)(rms / 16384.0), 0f, 1f);
     }
 
     public void Stop()
@@ -96,8 +110,6 @@ public class AudioCapture : IDisposable
         _arecordProcess?.WaitForExit(1000);
         _arecordProcess?.Dispose();
         _arecordProcess = null;
-
-        Console.WriteLine("[AudioCapture] Stopped");
     }
 
     public void Dispose()

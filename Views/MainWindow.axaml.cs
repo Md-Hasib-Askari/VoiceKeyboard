@@ -10,7 +10,6 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         KeyDown += OnKeyDown;
-        KeyUp += OnKeyUp;
     }
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
@@ -18,24 +17,18 @@ public partial class MainWindow : Window
         if (e.Key == Key.F9)
         {
             if (DataContext is MainViewModel vm)
-            {
-                if (vm.IsListening)
-                    vm.ToggleStartCommand.Execute(null);
-                else
-                    vm.ToggleStartCommand.Execute(null);
-            }
-        }
-        else if (e.Key == Key.F10)
-        {
-            if (DataContext is MainViewModel vm && vm.IsListening)
-            {
-                vm.TogglePauseCommand.Execute(null);
-            }
+                vm.ToggleStartCommand.Execute(null);
+            e.Handled = true;
         }
     }
 
-    private void OnKeyUp(object? sender, KeyEventArgs e)
+    public void ShowAndActivate()
     {
-        // Could implement push-to-talk here (hold F9 to talk)
+        if (WindowState == WindowState.Minimized)
+            WindowState = WindowState.Normal;
+        if (!IsVisible)
+            Show();
+        Activate();
+        Focus();
     }
 }
