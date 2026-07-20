@@ -1,7 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -28,11 +28,14 @@ public class App : Application
             var mainWindow = new MainWindow { DataContext = _viewModel };
             desktop.MainWindow = mainWindow;
 
-            desktop.Exit += (_, _) => Cleanup();
-
-            _hotkeyService = new GlobalHotkeyService(
-                () => mainWindow.ShowAndActivate());
+            _hotkeyService = new GlobalHotkeyService(new Dictionary<string, Action>
+            {
+                ["toggle"] = () => mainWindow.ShowAndActivate(),
+                ["start-stop"] = () => _viewModel.ToggleStartCommand.Execute(null),
+            });
             _hotkeyService.Start();
+
+            desktop.Exit += (_, _) => Cleanup();
         }
 
         base.OnFrameworkInitializationCompleted();
@@ -49,13 +52,6 @@ public class App : Application
         _hotkeyService?.Dispose();
         _viewModel?.DisposeSync();
 
-        KillYdotoold();
-        try { File.Delete(GlobalHotkeyService.SocketPath); } catch { }
-        try { File.Delete("/tmp/.ydotool_socket"); } catch { }
-    }
-
-    private static void KillYdotoold()
-    {
         try
         {
             using var process = Process.Start(new ProcessStartInfo
@@ -68,5 +64,8 @@ public class App : Application
             process?.WaitForExit(2000);
         }
         catch { }
+
+        try { File.Delete(GlobalHotkeyService.SocketPath); } catch { }
+        try { File.Delete("/tmp/.ydotool_socket"); } catch { }
     }
 }

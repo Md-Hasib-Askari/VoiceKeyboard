@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using System.Threading.Tasks;
@@ -8,7 +9,7 @@ namespace VoiceKeyboard.Services;
 
 public class GlobalHotkeyService : IDisposable
 {
-    private readonly Action _onToggle;
+    private readonly Dictionary<string, Action> _commands;
 
     private UnixDomainSocketEndPoint? _socketEndPoint;
     private Socket? _listenSocket;
@@ -19,9 +20,9 @@ public class GlobalHotkeyService : IDisposable
 
     public static readonly string SocketPath = Path.Combine(SocketDir, "toggle.sock");
 
-    public GlobalHotkeyService(Action onToggle)
+    public GlobalHotkeyService(Dictionary<string, Action> commands)
     {
-        _onToggle = onToggle;
+        _commands = commands;
     }
 
     public void Start()
@@ -44,12 +45,14 @@ public class GlobalHotkeyService : IDisposable
                     try
                     {
                         using var client = await _listenSocket.AcceptAsync();
-                        var buffer = new byte[16];
-                        await client.ReceiveAsync(buffer, SocketFlags.None);
-                        var cmd = System.Text.Encoding.UTF8.GetString(buffer).TrimEnd('\0', '\n', '\r');
-                        if (cmd == "toggle")
+                        var buffer = new byte[32];
+                        var len = await client.ReceiveAsync(buffer, SocketFlags.None);
+                        var cmd = System.Text.Encoding.UTF8.GetString(buffer, 0, len)
+                            .TrimEnd('\0', '\n', '\r');
+
+                        if (_commands.TryGetValue(cmd, out var action))
                         {
-                            _ = Dispatcher.UIThread.InvokeAsync(() => _onToggle());
+                            _ = Dispatcher.UIThread.InvokeAsync(() => action());
                         }
                     }
                     catch { }
@@ -68,17 +71,16 @@ public class GlobalHotkeyService : IDisposable
         try { File.Delete(SocketPath); } catch { }
     }
 
-    public static void SendToggleSignal()
+    public static void SendCommand(string command)
     {
         try
         {
             using var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
             socket.Connect(new UnixDomainSocketEndPoint(SocketPath));
-            socket.Send("toggle\n"u8);
+            socket.Send(System.Text.Encoding.UTF8.GetBytes(command + "\n"));
         }
         catch
         {
-            Console.WriteLine("Voice Keyboard is not running, launching...");
             throw;
         }
     }

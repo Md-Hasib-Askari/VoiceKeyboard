@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Net.Sockets;
 using Avalonia;
 using VoiceKeyboard.Services;
@@ -11,32 +10,57 @@ sealed class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        if (args.Length > 0 && args[0] == "--toggle-visibility")
+        if (args.Length > 0)
         {
-            TrySendToggle();
-            return;
+            var cmd = args[0] switch
+            {
+                "--toggle-visibility" => "start-stop",
+                "--start-stop" => "start-stop",
+                _ => null
+            };
+
+            if (cmd != null)
+            {
+                if (TrySendCommand(cmd))
+                    return;
+
+                LaunchApp();
+                return;
+            }
         }
 
-        // If another instance is already running, send toggle and exit
-        if (TrySendToggle())
+        if (TrySendCommand("toggle"))
             return;
 
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
 
-    private static bool TrySendToggle()
+    private static void LaunchApp()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = Environment.ProcessPath
+                    ?? System.Reflection.Assembly.GetExecutingAssembly().Location,
+                UseShellExecute = true,
+                CreateNoWindow = false,
+            });
+        }
+        catch { }
+    }
+
+    private static bool TrySendCommand(string command)
     {
         try
         {
             using var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
             socket.Connect(new UnixDomainSocketEndPoint(GlobalHotkeyService.SocketPath));
-            socket.Send("toggle\n"u8);
+            socket.Send(System.Text.Encoding.UTF8.GetBytes(command + "\n"));
             return true;
         }
         catch
         {
-            // Stale socket file? Remove it.
-            try { System.IO.File.Delete(GlobalHotkeyService.SocketPath); } catch { }
             return false;
         }
     }

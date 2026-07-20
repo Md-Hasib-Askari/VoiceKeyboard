@@ -60,7 +60,7 @@
 
             <!-- Row 2: Shortcuts -->
             <TextBlock Grid.Row="2" Grid.ColumnSpan="2"
-                       Text="F9 Start / Stop  ·  Super+F9 Launch"
+                       Text="Super+F9 Launch  ·  Ctrl+Alt+F9 Start/Stop"
                        Foreground="#484f58" FontSize="9"
                        HorizontalAlignment="Center"
                        Margin="0,3,0,0" />

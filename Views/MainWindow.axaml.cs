@@ -24,10 +24,18 @@ public partial class MainWindow : Window
 
     public void ShowAndActivate()
     {
-        if (WindowState == WindowState.Minimized)
-            WindowState = WindowState.Normal;
+        try
+        {
+            if (WindowState == WindowState.Minimized)
+                WindowState = WindowState.Normal;
+        }
+        catch { }
+
         if (!IsVisible)
+        {
+            Topmost = true;
             Show();
+        }
         Activate();
         Focus();
     }
